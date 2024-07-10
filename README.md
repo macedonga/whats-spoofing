@@ -33,5 +33,5 @@ Happy spoofing! 🎉
 
 ---
 
-*I forked and updated this project with a newer version of Whatsmeow and a web interface. /
-The original project has been deleted from Github, but it was made by [@lichti](https://github.com/lichti/)*
+*I forked and updated this project with a newer version of Whatsmeow and a web interface.* /
+*The original project has been deleted from Github, but it was made by [@lichti](https://github.com/lichti/)*
