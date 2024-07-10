@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp spoofer</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+
+    <style type="text/tailwindcss">
+        @tailwind base;
+        @tailwind components;
+        @tailwind utilities;
+
+        body {
+            @apply bg-gray-950 text-white;
+
+            color-scheme: dark;
+            font-family: "Inter", sans-serif;
+            font-optical-sizing: auto;
+            font-style: normal;
+            font-variation-settings: "slnt" 0;
+        }
+
+        .group-container {
+            @apply w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="grid h-screen w-screen items-center justify-center">
+        <div class="grid gap-8">
+            <form
+                onsubmit="sendForm(); return false;"
+                class="p-4 bg-white/10 rounded-lg grid gap-2 w-96"
+            >
+                <h1 class="text-2xl font-bold">WhatsApp spoofer</h1>
+
+                <input type="text" class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
+                    placeholder="Phone number or group id" id="cid">
+                <input type="text" class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
+                    placeholder="Impersonated id" id="sid">
+                <input type="text" class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
+                    placeholder="Spoofed message" id="spf_msg">
+                <input type="text" class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
+                    placeholder="Reply to spoofed message" id="rpl_msg">
+
+                <button type="submit"
+                    class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none">Send</button>
+            </form>
+
+            <div class="p-4 bg-white/10 rounded-lg grid gap-2 w-96">
+                <h2 class="text-xl font-bold">Group IDs</h2>
+
+                <div class="overflow-y-auto max-h-64 grid gap-2 pr-2" id="gids">
+                    Fetching...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
