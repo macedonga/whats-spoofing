@@ -247,7 +247,7 @@ func download(evt_type string, file interface{}, mimetype string, evt *events.Me
 			data := file.(*waE2E.ContactMessage)
 			err = postEventFile(evt_type, rawEvt, nil, file_name, []byte(*data.Vcard))
 		} else {
-			data, err := cli.Download(file.(whatsmeow.DownloadableMessage))
+			data, err := cli.Download(context.Background(), file.(whatsmeow.DownloadableMessage))
 			if err != nil {
 				postError(evt_type, fmt.Sprintf("%s Failed to download", evt_type), rawEvt)
 				return err
