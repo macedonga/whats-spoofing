@@ -21,3 +21,5 @@ notas.txt
 db/
 data/
 whats-spoofing
+*.exe
+*.db-journal

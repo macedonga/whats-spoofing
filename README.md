@@ -2,12 +2,11 @@
 
 Reply spoofer for WhatsApp messages.
 
-## Installation
+## Building
 
 ```bash
 $ git clone https://github.com/macedonga/whats-spoofing.git
 $ cd whats-spoofing
-$ mkdir -p data && mkdir -p db && mkdir -p history
 $ go mod download
 $ go build
 ```
@@ -15,23 +14,20 @@ $ go build
 ## Usage
 
 ```bash
-$ ./whats-spoofing
+$ ./whats-spoofing # or .\whats-spoofing.exe on Windows
 ```
 
-Once you see a QR code on the terminal, scan it with your WhatsApp app just like when you login on WhatsApp web. \
-This is necessary to get the session token to send messages. \
-After that, when you see on your terminal `Listening on localhost:8080`, open a browser tab and go to `http://localhost:8080`.
+After running the command, if ran for the first time, a "whats-spoofing.db" file will be created in the current directory. \
+This file contains the WhatsApp session data and must be kept safe.
 
-You will see a form to send messages. \
+Open your browser and go to `http://localhost:8080/`. You'll have to scan the QR code with your WhatsApp app, just like when you login on WhatsApp web. \
+After scanning the QR code, the page will reload and you'll see some inputs and a list of group IDs.
+
 Fill the form with the phone number (with the international prefix but without +) you want to send the message to, the number of the user to spoof (the number that will appear on the message), the spoofed reply message and the reply, sent by you. \
 If you want to send a spoofed message to a group, just copy and paste the group ID (which you can get below the sender form) on the first phone number input. \
 Click on the `Send` button and the message will be sent.
 
 Happy spoofing! 🎉
 
-**Use this tool responsibly! I'm not responsible for any misuse of this tool.**
-
----
-
-*I forked and updated this project with a newer version of Whatsmeow and a web interface.* \
-*The original project has been deleted from Github, but it was made by [@lichti](https://github.com/lichti/)*
+> [!CAUTION]
+> Use this tool responsibly! I'm not responsible for any misuse of this tool.
