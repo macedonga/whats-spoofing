@@ -45,7 +45,7 @@ var (
 	logLevel        = "INFO"
 	debugLogs       = flag.Bool("debug", false, "Enable debug logs")
 	dbDialect       = flag.String("db-dialect", "sqlite", "Database dialect (sqlite or postgres)")
-	dbAddress       = flag.String("db-address", "./whats-spoofing.db?_pragma=foreign_keys(1)", "Database address")
+	dbAddress       = flag.String("db-address", "file:whats-spoofing.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", "Database address")
 	requestFullSync = flag.Bool("request-full-sync", false, "Request full (1 year) history sync when logging in")
 )
 
@@ -86,6 +86,7 @@ func main() {
 		logger.Errorf("Failed to connect to database: %v", err)
 		return
 	}
+	defer storeContainer.Close()
 
 	device, err := storeContainer.GetFirstDevice(context.Background())
 	if err != nil {
@@ -217,7 +218,7 @@ func cmdSendSpoofedReply(args []string) string {
 }
 
 func cmdListGroups() string {
-	groups, err := whatsappClient.GetJoinedGroups()
+	groups, err := whatsappClient.GetJoinedGroups(context.Background())
 	if err != nil {
 		return "Failed to get group list: " + err.Error()
 	}
@@ -321,7 +322,7 @@ func handleWhatsAppEvents(rawEvt interface{}) {
 	switch evt := rawEvt.(type) {
 	case *events.AppStateSyncComplete:
 		if len(whatsappClient.Store.PushName) > 0 && evt.Name == appstate.WAPatchCriticalBlock {
-			err := whatsappClient.SendPresence(types.PresenceAvailable)
+			err := whatsappClient.SendPresence(context.Background(), types.PresenceAvailable)
 			logger.Errorf("AppStateSyncComplete %s: %v", rawEvt, err)
 		}
 		return
@@ -331,7 +332,7 @@ func handleWhatsAppEvents(rawEvt interface{}) {
 		}
 		isLoggedIn = true
 		currentQRCode = ""
-		err := whatsappClient.SendPresence(types.PresenceAvailable)
+		err := whatsappClient.SendPresence(context.Background(), types.PresenceAvailable)
 		if err != nil {
 			logger.Errorf("Failed to send presence: %v", err)
 		}
