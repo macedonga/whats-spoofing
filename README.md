@@ -2,6 +2,12 @@
 
 Reply spoofer for WhatsApp messages.
 
+## Download
+
+Latest nightly builds:
+- [Windows (exe)](https://github.com/macedonga/whats-spoofing/releases/download/nightly/whats-spoofing-windows.exe)
+- [Linux](https://github.com/macedonga/whats-spoofing/releases/download/nightly/whats-spoofing-linux)
+
 ## Building
 
 ```bash
