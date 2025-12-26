@@ -1,99 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WhatsApp spoofer</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap"
+      rel="stylesheet"
+    />
 
     <style type="text/tailwindcss">
-        @tailwind base;
-        @tailwind components;
-        @tailwind utilities;
+      @tailwind base;
+      @tailwind components;
+      @tailwind utilities;
 
-        body {
-            @apply bg-gray-950 text-white;
+      body {
+        @apply bg-gray-950 text-white;
 
-            color-scheme: dark;
-            font-family: "Inter", sans-serif;
-            font-optical-sizing: auto;
-            font-style: normal;
-            font-variation-settings: "slnt" 0;
-        }
+        color-scheme: dark;
+        font-family: "Inter", sans-serif;
+        font-optical-sizing: auto;
+        font-style: normal;
+        font-variation-settings: "slnt" 0;
+      }
 
-        .group-container {
-            @apply w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg;
-        }
+      .group-container {
+        @apply w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg;
+      }
 
-        .hidden {
-            display: none !important;
-        }
+      .hidden {
+        display: none !important;
+      }
     </style>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="grid h-screen w-screen items-center justify-center">
-        <!-- Loading Screen -->
-        <div id="loading-screen" class="text-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-            <p class="text-lg">Checking connection status...</p>
-        </div>
+      <!-- Loading Screen -->
+      <div id="loading-screen" class="text-center">
+        <div
+          class="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"
+        ></div>
+        <p class="text-lg">Checking connection status...</p>
+      </div>
 
-        <!-- QR Code Screen -->
-        <div id="qr-screen" class="hidden text-center">
-            <div class="p-8 bg-white/10 rounded-lg">
-                <h1 class="text-2xl font-bold mb-6">WhatsApp Authentication</h1>
-                <p class="mb-6 text-gray-300">Scan this QR code with your WhatsApp mobile app:</p>
-                <div class="bg-white p-4 rounded-lg mb-6 mx-auto w-fit">
-                    <img id="qr-image" src="" alt="QR Code" class="w-64 h-64" />
-                </div>
-                <p class="text-sm text-gray-400">Waiting for scan...</p>
-                <div class="mt-4">
-                    <button onclick="checkStatus()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg">
-                        Refresh Status
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main App Screen -->
-        <div id="main-screen" class="hidden grid gap-8">
-            <form
-                onsubmit="sendForm(); return false;"
-                class="p-4 bg-white/10 rounded-lg grid gap-2 w-96"
+      <!-- QR Code Screen -->
+      <div id="qr-screen" class="hidden text-center">
+        <div class="p-8 bg-white/10 rounded-lg">
+          <h1 class="text-2xl font-bold mb-6">WhatsApp Authentication</h1>
+          <p class="mb-6 text-gray-300">
+            Scan this QR code with your WhatsApp mobile app:
+          </p>
+          <div class="bg-white p-4 rounded-lg mb-6 mx-auto w-fit">
+            <img id="qr-image" src="" alt="QR Code" class="w-64 h-64" />
+          </div>
+          <p class="text-sm text-gray-400">Waiting for scan...</p>
+          <div class="mt-4">
+            <button
+              onclick="checkStatus()"
+              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg"
             >
-                <h1 class="text-2xl font-bold">WhatsApp spoofer</h1>
-                <div class="text-sm text-green-400 mb-2">✓ Connected to WhatsApp</div>
-
-                <input type="text" class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
-                    placeholder="Phone number or group id" id="cid">
-                <input type="text" class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
-                    placeholder="Impersonated id" id="sid">
-                <input type="text" class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
-                    placeholder="Spoofed message" id="spf_msg">
-                <input type="text" class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
-                    placeholder="Reply to spoofed message" id="rpl_msg">
-
-                <button type="submit"
-                    class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none hover:bg-white/20">Send</button>
-            </form>
-
-            <div class="p-4 bg-white/10 rounded-lg grid gap-2 w-96">
-                <h2 class="text-xl font-bold">Group IDs</h2>
-
-                <div class="overflow-y-auto max-h-64 grid gap-2 pr-2" id="gids">
-                    Fetching...
-                </div>
-            </div>
+              Refresh Status
+            </button>
+          </div>
         </div>
+      </div>
+
+      <!-- Main App Screen -->
+      <div id="main-screen" class="hidden grid gap-8">
+        <form
+          onsubmit="sendForm(); return false;"
+          class="p-4 bg-white/10 rounded-lg grid gap-2 w-96"
+        >
+          <h1 class="text-2xl font-bold text-center">WhatsApp spoofer</h1>
+
+          <input
+            type="text"
+            list="chat-list"
+            class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
+            placeholder="Phone number or group id"
+            id="cid"
+            autocomplete="off"
+          />
+          <input
+            type="text"
+            list="chat-list"
+            class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
+            placeholder="Impersonated id"
+            id="sid"
+            autocomplete="off"
+          />
+          <input
+            type="text"
+            class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
+            placeholder="Spoofed message"
+            id="spf_msg"
+            autocomplete="off"
+          />
+          <input
+            type="text"
+            class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none"
+            placeholder="Reply to spoofed message"
+            id="rpl_msg"
+          />
+
+          <datalist id="chat-list"></datalist>
+
+          <button
+            type="submit"
+            class="w-full px-2 py-1 border border-white/10 bg-white/10 rounded-lg outline-none hover:bg-white/20"
+          >
+            Send
+          </button>
+        </form>
+      </div>
     </div>
 
     <script src="script.js"></script>
-</body>
-
+  </body>
 </html>

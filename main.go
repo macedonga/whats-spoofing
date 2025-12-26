@@ -7,9 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"fmt"
 	"io/fs"
-	"mime"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,13 +19,11 @@ import (
 	_ "modernc.org/sqlite"
 
 	"go.mau.fi/whatsmeow"
-	"go.mau.fi/whatsmeow/appstate"
 	waBinary "go.mau.fi/whatsmeow/binary"
 	waE2E "go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
-	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
@@ -65,6 +61,13 @@ type (
 	StatusResponse struct {
 		LoggedIn bool   `json:"loggedIn"`
 		QR       string `json:"qr,omitempty"`
+	}
+
+	ChatItem struct {
+		Name     string `json:"name"`
+		PushName string `json:"pushname,omitempty"`
+		JID      string `json:"jid"`
+		Type     string `json:"type"`
 	}
 )
 
@@ -114,7 +117,6 @@ func main() {
 		go handleQRCodeEvents(ch)
 	}
 
-	whatsappClient.AddEventHandler(handleWhatsAppEvents)
 	go startHTTPServer()
 
 	err = whatsappClient.Connect()
@@ -160,6 +162,7 @@ func startHTTPServer() {
 
 	mux.HandleFunc("/send-spoofed", handleSendSpoofedMessage)
 	mux.HandleFunc("/get-groups", handleGetGroups)
+	mux.HandleFunc("/get-chats", handleGetChats)
 	mux.HandleFunc("/status", handleStatus)
 
 	server := &http.Server{
@@ -175,77 +178,25 @@ func startHTTPServer() {
 	}
 }
 
-func cmdSendSpoofedReply(args []string) string {
-	if len(args) < 4 {
-		return "Usage: send-spoofed-reply <chat_jid> <msgID:!|#ID> <spoofed_jid> <spoofed_text>|<text>"
+func apiErrorResponse(w http.ResponseWriter, message string, statusCode int) {
+	responseData := APIResponse{
+		Message: message,
 	}
 
-	chat_jid, ok := parseJID(args[0])
-	if !ok {
-		return "You need to specify a valid Chat ID (Group or User)"
-	}
+	w.WriteHeader(statusCode)
 
-	msgID := args[1]
-	if msgID[0] == '!' {
-		msgID = whatsappClient.GenerateMessageID()
+	if err := json.NewEncoder(w).Encode(responseData); err != nil {
+		http.Error(w, "Error encoding JSON response", http.StatusInternalServerError)
+		return
 	}
-
-	spoofed_jid, ok2 := parseJID(args[2])
-	if !ok2 {
-		return "You need to specify a valid User ID to spoof"
-	}
-
-	parameters := []string{args[3]}
-	if len(args) > 4 {
-		parameters = append(parameters, args[4])
-	}
-	if len(parameters) < 2 {
-		parts := splitOnPipe(args[3])
-		if len(parts) == 2 {
-			parameters = parts
-		} else {
-			return "Invalid format. Use: <spoofed_text>|<text>"
-		}
-	}
-	spoofed_text := parameters[0]
-	text := parameters[1]
-
-	_, resp, err := sendSpoofedReplyMessage(chat_jid, spoofed_jid, msgID, spoofed_text, text)
-	if err != nil {
-		return "Error on sending spoofed msg: " + err.Error()
-	}
-	return "Spoofed message sent: " + resp.ID
-}
-
-func cmdListGroups() string {
-	groups, err := whatsappClient.GetJoinedGroups(context.Background())
-	if err != nil {
-		return "Failed to get group list: " + err.Error()
-	}
-	result := ""
-	for _, group := range groups {
-		result += group.GroupName.Name + ": " + group.JID.String() + "\n"
-	}
-	return result
-}
-
-func splitOnPipe(input string) []string {
-	result := []string{}
-	current := ""
-	for _, char := range input {
-		if char == '|' {
-			result = append(result, current)
-			current = ""
-		} else {
-			current += string(char)
-		}
-	}
-	result = append(result, current)
-	return result
 }
 
 func handleSendSpoofedMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
+		responseData := APIResponse{
+			Message: "",
+		}
+
 		var requestData SpoofedMessageRequest
 		if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
 			http.Error(w, "Error parsing JSON request body", http.StatusBadRequest)
@@ -257,19 +208,51 @@ func handleSendSpoofedMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var args = []string{requestData.ChatID, requestData.MessageID, requestData.SpoofedID, requestData.SpoofedMessage + "|" + requestData.ReplyMessage}
-
-		var output = cmdSendSpoofedReply(args)
-		logger.Infof("output: %s", output)
-
-		w.WriteHeader(http.StatusOK)
-
+		logger.Infof("Received send-spoofed request: %+v", requestData)
 		w.Header().Set("Content-Type", "application/json")
 
-		responseData := APIResponse{
-			Message: output,
+		chat_jid, ok := parseJID(requestData.ChatID)
+		if !ok {
+			apiErrorResponse(w, "You need to specify a valid Chat ID (Group or User)", http.StatusBadRequest)
+			return
 		}
 
+		msgID := requestData.MessageID
+		if msgID[0] == '!' {
+			msgID = whatsappClient.GenerateMessageID()
+		}
+
+		spoofed_jid, ok2 := parseJID(requestData.SpoofedID)
+		if !ok2 {
+			apiErrorResponse(w, "You need to specify a valid User ID to spoof", http.StatusBadRequest)
+			return
+		}
+
+		msg := &waE2E.Message{
+			ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+				Text: proto.String(requestData.ReplyMessage),
+				ContextInfo: &waE2E.ContextInfo{
+					StanzaID:    proto.String(msgID),
+					Participant: proto.String(spoofed_jid.String()),
+					RemoteJID:   proto.String(spoofed_jid.String()),
+					QuotedMessage: &waE2E.Message{
+						Conversation: proto.String(requestData.SpoofedMessage),
+					},
+				},
+			},
+		}
+
+		resp, err := whatsappClient.SendMessage(context.Background(), chat_jid, msg)
+		if err != nil {
+			logger.Errorf("Error sending reply message: %v", err)
+			apiErrorResponse(w, "Error on sending spoofed msg: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		logger.Infof("Message sent (server timestamp: %s)", resp.Timestamp)
+		responseData.Message = "Spoofed message sent: " + resp.ID
+
+		w.WriteHeader(http.StatusOK)
 		if err := json.NewEncoder(w).Encode(responseData); err != nil {
 			http.Error(w, "Error encoding JSON response", http.StatusInternalServerError)
 			return
@@ -283,12 +266,64 @@ func handleSendSpoofedMessage(w http.ResponseWriter, r *http.Request) {
 
 func handleGetGroups(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		var output = cmdListGroups()
+
+		groups, err := whatsappClient.GetJoinedGroups(context.Background())
+		if err != nil {
+			apiErrorResponse(w, "Failed to get group list: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		result := ""
+		for _, group := range groups {
+			result += group.GroupName.Name + ": " + group.JID.String() + "\n"
+		}
 
 		w.WriteHeader(http.StatusOK)
 
-		w.Write([]byte(output))
+		w.Write([]byte(result))
 
+		return
+	}
+	w.WriteHeader(http.StatusBadRequest)
+	w.Write([]byte("Invalid request"))
+}
+
+func handleGetChats(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		var chats []ChatItem
+
+		contacts, err := whatsappClient.Store.Contacts.GetAllContacts(context.Background())
+		if err == nil {
+			for jid, info := range contacts {
+				chats = append(chats, ChatItem{
+					Name:     info.FullName,
+					PushName: info.PushName,
+					JID:      jid.String(),
+					Type:     "contact",
+				})
+			}
+		}
+
+		groups, err := whatsappClient.GetJoinedGroups(context.Background())
+		if err == nil {
+			for _, group := range groups {
+				chats = append(chats, ChatItem{
+					Name: group.GroupName.Name,
+					JID:  group.JID.String(),
+					Type: "group",
+				})
+			}
+		}
+
+		jsonData, err := json.Marshal(chats)
+		if err != nil {
+			logger.Errorf("Failed to marshal chats: %v", err)
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(string(jsonData)))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(string(jsonData)))
 		return
 	}
 	w.WriteHeader(http.StatusBadRequest)
@@ -318,122 +353,6 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Invalid request"))
 }
 
-func handleWhatsAppEvents(rawEvt interface{}) {
-	switch evt := rawEvt.(type) {
-	case *events.AppStateSyncComplete:
-		if len(whatsappClient.Store.PushName) > 0 && evt.Name == appstate.WAPatchCriticalBlock {
-			err := whatsappClient.SendPresence(context.Background(), types.PresenceAvailable)
-			logger.Errorf("AppStateSyncComplete %s: %v", rawEvt, err)
-		}
-		return
-	case *events.Connected, *events.PushNameSetting:
-		if len(whatsappClient.Store.PushName) == 0 {
-			return
-		}
-		isLoggedIn = true
-		currentQRCode = ""
-		err := whatsappClient.SendPresence(context.Background(), types.PresenceAvailable)
-		if err != nil {
-			logger.Errorf("Failed to send presence: %v", err)
-		}
-		logger.Infof("Successfully connected to WhatsApp")
-		return
-	case *events.StreamReplaced:
-		os.Exit(0)
-	case *events.Message:
-		logger.Infof("Received message %s from %s (%s)", evt.Info.ID, evt.Info.SourceString())
-
-		img := evt.Message.GetImageMessage()
-		if img != nil {
-			ok := download("Message.GetImageMessage", evt.Message.GetImageMessage(), evt.Message.GetImageMessage().GetMimetype(), evt, rawEvt)
-			if ok == nil {
-				return
-			}
-		}
-
-		audio := evt.Message.GetAudioMessage()
-		if audio != nil {
-			ok := download("Message.GetAudioMessage", evt.Message.GetAudioMessage(), evt.Message.GetAudioMessage().GetMimetype(), evt, rawEvt)
-			if ok == nil {
-				return
-			}
-		}
-
-		video := evt.Message.GetVideoMessage()
-		if video != nil {
-			ok := download("Message.GetVideoMessage", evt.Message.GetVideoMessage(), evt.Message.GetVideoMessage().GetMimetype(), evt, rawEvt)
-			if ok == nil {
-				return
-			}
-		}
-
-		doc := evt.Message.GetDocumentMessage()
-		if doc != nil {
-			ok := download("Message.GetDocumentMessage", evt.Message.GetDocumentMessage(), evt.Message.GetDocumentMessage().GetMimetype(), evt, rawEvt)
-			if ok == nil {
-				return
-			}
-		}
-
-		sticker := evt.Message.GetStickerMessage()
-		if sticker != nil {
-			ok := download("Message.GetStickerMessage", evt.Message.GetStickerMessage(), evt.Message.GetStickerMessage().GetMimetype(), evt, rawEvt)
-			if ok == nil {
-				return
-			}
-		}
-
-		contact := evt.Message.GetContactMessage()
-		if contact != nil {
-			ok := download("Message.GetContactMessage", evt.Message.GetContactMessage(), "text/vcard", evt, rawEvt)
-			if ok == nil {
-				return
-			}
-		}
-
-		postEvent("Message", rawEvt, nil)
-		return
-	}
-}
-
-func postEventFile(evt_type string, raw interface{}, extra interface{}, file_name string, file_bytes []byte) error {
-	logger.Infof("Event(%s): \n  File: %s \n  Extra: %+v \n  Raw: %+v", evt_type, file_name, extra, raw)
-	return nil
-}
-
-func postEvent(evt_type string, raw interface{}, extra interface{}) error {
-	logger.Infof("Event(%s): \n%+v", evt_type, raw)
-	return nil
-}
-
-func postError(evt_type string, evt_error string, raw interface{}) error {
-	logger.Errorf("Error(%s): %s \n%+v", evt_type, evt_error, raw)
-	return nil
-}
-
-func sendSpoofedReplyMessage(chatID types.JID, fromID types.JID, msgID string, replyText string, myText string) (*waE2E.Message, *whatsmeow.SendResponse, error) {
-	msg := &waE2E.Message{
-		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
-			Text: proto.String(myText),
-			ContextInfo: &waE2E.ContextInfo{
-				StanzaID:    proto.String(msgID),
-				Participant: proto.String(fromID.String()),
-				QuotedMessage: &waE2E.Message{
-					Conversation: proto.String(replyText),
-				},
-			},
-		},
-	}
-	resp, err := whatsappClient.SendMessage(context.Background(), chatID, msg)
-	if err != nil {
-		logger.Errorf("Error sending reply message: %v", err)
-		return msg, &resp, err
-	} else {
-		logger.Infof("Message sent (server timestamp: %s)", resp.Timestamp)
-		return msg, &resp, err
-	}
-}
-
 func parseJID(arg string) (types.JID, bool) {
 	if arg[0] == '+' {
 		arg = arg[1:]
@@ -451,32 +370,4 @@ func parseJID(arg string) (types.JID, bool) {
 		}
 		return recipient, true
 	}
-}
-
-func download(evt_type string, file interface{}, mimetype string, evt *events.Message, rawEvt interface{}) error {
-	if file != nil {
-		exts, _ := mime.ExtensionsByType(mimetype)
-		file_name := fmt.Sprintf("%s%s", evt.Info.ID, exts[0])
-		if mimetype == "text/vcard" {
-			data := file.(*waE2E.ContactMessage)
-			err := postEventFile(evt_type, rawEvt, nil, file_name, []byte(*data.Vcard))
-			if err != nil {
-				postError(evt_type, fmt.Sprintf("%s Failed to save event", evt_type), rawEvt)
-				return err
-			}
-		} else {
-			data, err := whatsappClient.Download(context.Background(), file.(whatsmeow.DownloadableMessage))
-			if err != nil {
-				postError(evt_type, fmt.Sprintf("%s Failed to download", evt_type), rawEvt)
-				return err
-			}
-			err = postEventFile(evt_type, rawEvt, nil, file_name, data)
-			if err != nil {
-				postError(evt_type, fmt.Sprintf("%s Failed to save event", evt_type), rawEvt)
-				return err
-			}
-		}
-		return nil
-	}
-	return errors.New("file is nil")
 }

@@ -1,4 +1,7 @@
 let statusCheckInterval;
+let chatsInterval;
+
+const chatsIntervalTimeout = 5000;
 
 const showScreen = (screenId) => {
     document.getElementById("loading-screen").classList.add("hidden");
@@ -7,6 +10,29 @@ const showScreen = (screenId) => {
     
     document.getElementById(screenId).classList.remove("hidden");
 };
+
+const lists = [
+    "cid",
+    "sid",
+]
+
+// Pause chat fetching when input fields are focused
+for (const listId of lists) {
+    const input = document.getElementById(listId);
+
+    input.addEventListener("focus", () => {
+        if (chatsInterval) {
+            clearInterval(chatsInterval);
+            chatsInterval = null;
+        }
+    });
+
+    input.addEventListener("blur", () => {
+        if (!chatsInterval) {
+            chatsInterval = setInterval(fetchChats, chatsIntervalTimeout);
+        }
+    });
+}
 
 const checkStatus = async () => {
     try {
@@ -17,7 +43,8 @@ const checkStatus = async () => {
             // User is logged in, show main interface
             clearInterval(statusCheckInterval);
             showScreen("main-screen");
-            fetchGids();
+            fetchChats();
+            if (!chatsInterval) chatsInterval = setInterval(fetchChats, chatsIntervalTimeout);
         } else {
             // User is not logged in, show QR screen
             showScreen("qr-screen");
@@ -57,31 +84,29 @@ const displayQRCode = (qrData) => {
     img.alt = "WhatsApp QR Code";
 };
 
-const fetchGids = async () => {
+const fetchChats = async () => {
     try {
-        const res = await fetch("/get-groups");
-        let data = (await res.text()).split("\n").map(e => e.trim());
+        const res = await fetch("/get-chats");
+        const chats = await res.json();
 
-        data = data
-            .filter(e => e.length > 0)
-            .map(e => {
-                let split = e.split(":");
-                const id = split.pop();
-                const name = split.join(":");
-
-                return `<div class="group-container"><b>${name}</b><br /><code>${id}</code></div>`;
-            });
-
-        const container = document.getElementById("gids");
+        chats.sort((a, b) => {
+            const nameA = (a.name || a.pushname || "Unknown").toLowerCase();
+            const nameB = (b.name || b.pushname || "Unknown").toLowerCase();
+            return nameA.localeCompare(nameB);
+        });
         
-        if (data.length === 0) {
-            container.innerHTML = '<div class="text-gray-400 text-center">No groups found</div>';
-        } else {
-            container.innerHTML = data.join("");
-        }
+        const datalist = document.getElementById("chat-list");
+        datalist.innerHTML = "";
+
+        chats.forEach(chat => {
+            const option = document.createElement("option");
+            option.value = chat.jid;
+            const name = chat.name || chat.pushname || "Unknown";
+            option.label = `${name} (${chat.type})`; 
+            datalist.appendChild(option);
+        });
     } catch (error) {
-        console.error("Failed to fetch groups:", error);
-        document.getElementById("gids").innerHTML = '<div class="text-red-400 text-center">Failed to load groups</div>';
+        console.error("Failed to fetch chats:", error);
     }
 };
 
