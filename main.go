@@ -3,10 +3,12 @@ package main
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"mime"
 	"net/http"
 	"os"
@@ -35,6 +37,9 @@ var (
 	currentQRCode  string
 	isLoggedIn     bool
 )
+
+//go:embed client
+var clientFS embed.FS
 
 var (
 	logLevel        = "INFO"
@@ -144,8 +149,13 @@ func handleQRCodeEvents(ch <-chan whatsmeow.QRChannelItem) {
 func startHTTPServer() {
 	mux := http.NewServeMux()
 
-	fileServer := http.FileServer(http.Dir("client/"))
-	mux.Handle("/", fileServer)
+	clientFiles, err := fs.Sub(clientFS, "client")
+	if err != nil {
+		logger.Errorf("Failed to load client files: %v", err)
+	} else {
+		fileServer := http.FileServer(http.FS(clientFiles))
+		mux.Handle("/", fileServer)
+	}
 
 	mux.HandleFunc("/send-spoofed", handleSendSpoofedMessage)
 	mux.HandleFunc("/get-groups", handleGetGroups)
